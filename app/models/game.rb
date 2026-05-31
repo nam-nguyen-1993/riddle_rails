@@ -180,17 +180,24 @@ class Game < ApplicationRecord
   end
 
   def topic_varied_questions
-    # Pull a large pool ordered by recency, then round-robin by topic
-    # so mixed games always have maximum variety (max 2 per topic).
-    pool = recency_weighted_questions.limit(question_count * 4).to_a
+    # Pull a generous pool ordered by recency, then round-robin by topic.
+    # Prefer variety (1 per topic first, then 2nd, then 3rd, …) but always
+    # fill up to question_count even if that means many from one topic.
+    pool = recency_weighted_questions.limit([question_count * 5, 60].max).to_a
     by_topic = pool.group_by(&:topic_id).values.shuffle
 
     result = []
-    (1..2).each do |pass|
+    pass = 1
+    loop do
+      added = false
       by_topic.each do |topic_qs|
-        result << topic_qs[pass - 1] if topic_qs.size >= pass && result.size < question_count
+        if topic_qs.size >= pass && result.size < question_count
+          result << topic_qs[pass - 1]
+          added = true
+        end
       end
-      break if result.size >= question_count
+      break unless added && result.size < question_count
+      pass += 1
     end
 
     result.shuffle.first(question_count)
@@ -206,7 +213,7 @@ class Game < ApplicationRecord
     question_pool
       .unscope(:order)
       .multiple_choice
-      .order(Arel.sql("(#{last_played_sql}) ASC NULLS FIRST, RANDOM()"))
+      .order(Arel.sql("(#{last_played_sql}) ASC NULLS FIRST, questions.created_at DESC, RANDOM()"))
   end
 
   def player_limit
