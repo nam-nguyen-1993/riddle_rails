@@ -4,7 +4,7 @@ services:
     runtime: ruby
     plan: free
     buildCommand: "./bin/render-build.sh"
-    startCommand: "bundle exec rails db:migrate db:seed && HTTP_PORT=${PORT:-10000} TARGET_PORT=3000 bundle exec thrust bin/rails server -b 0.0.0.0"
+    startCommand: "bundle exec rails db:migrate db:seed && bin/rails server -b 0.0.0.0 -p $PORT"
     healthCheckPath: /up
     envVars:
       - key: RAILS_ENV
@@ -19,10 +19,6 @@ services:
         value: "3"
       - key: MALLOC_ARENA_MAX
         value: "2"
-      - key: HTTP_PORT
-        value: "10000"
-      - key: TARGET_PORT
-        value: "3000"
       - key: DATABASE_URL
         sync: false
       - key: PREPEND_TOKEN_OPENAI
