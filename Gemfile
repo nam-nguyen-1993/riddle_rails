@@ -7,6 +7,7 @@ gem "puma", ">= 5.0"                  # Web server
 gem "importmap-rails"                 # JavaScript with ESM import maps
 gem "turbo-rails"                     # Hotwire page acceleration (SPA-like)
 gem "stimulus-rails"                  # Hotwire JavaScript framework
+gem "ruby_llm", "~> 1.15"             # OpenAI-compatible LLM client
 gem "solid_cache"                     # Database-backed Rails.cache
 gem "solid_queue", "~> 1.3" # Database-backed Active Job
 gem "solid_cable"                     # Database-backed Action Cable
@@ -14,6 +15,7 @@ gem "bootsnap", require: false        # Faster boot times via caching
 gem "thruster", require: false        # HTTP caching/compression for Puma
 gem "tzinfo-data", platforms: %i[windows jruby] # Timezone data for Windows/JRuby
 gem "dotenv"                          # Load environment variables from .env
+gem "devise"                          # Login and authentication
 gem "http"                            # Simple HTTP client for APIs
 gem "rollbar"                         # Error tracking in production
 gem "appdev_support"                  # Learning helpers (nicer error messages, etc.)

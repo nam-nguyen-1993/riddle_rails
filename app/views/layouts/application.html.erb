@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title><%= content_for(:title) || "Rails 8 Template" %></title>
+    <title><%= content_for(:title) || "I Have a Riddle for You" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
@@ -22,7 +22,33 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <body>
-    <%= yield %>
+  <body class="<%= content_for(:body_class) %>">
+    <header class="topbar">
+      <%= link_to "I Have a Riddle for You", root_path, class: "brand" %>
+      <details class="menu">
+        <summary aria-label="Open navigation">☰</summary>
+        <nav>
+          <% if user_signed_in? %>
+            <%= link_to "Dashboard", dashboard_path %>
+            <%= link_to "New game", new_game_path %>
+            <%= button_to "Sign out", destroy_user_session_path, method: :delete, class: "nav-button" %>
+          <% else %>
+            <%= link_to "Sign in", new_user_session_path %>
+            <%= link_to "Sign up", new_user_registration_path %>
+          <% end %>
+        </nav>
+      </details>
+    </header>
+
+    <main class="container">
+      <% if notice.present? %>
+        <div class="notice"><%= notice %></div>
+      <% end %>
+      <% if alert.present? %>
+        <div class="notice error"><%= alert %></div>
+      <% end %>
+
+      <%= yield %>
+    </main>
   </body>
 </html>

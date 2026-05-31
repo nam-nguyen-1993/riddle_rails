@@ -1,0 +1,37 @@
+<% content_for :title, "#{@topic.name} – Questions" %>
+
+<div class="container">
+  <div class="page-header">
+    <div>
+      <p class="eyebrow"><%= link_to "← Dashboard", dashboard_path %></p>
+      <h1><%= @topic.name %></h1>
+      <p class="lede"><%= pluralize(@questions.size, "active question") %></p>
+    </div>
+  </div>
+
+  <% if @questions.empty? %>
+    <p>No active questions for this topic.</p>
+  <% else %>
+    <div class="question-review-list">
+      <% @questions.each do |question| %>
+        <article class="review-card">
+          <div class="review-card-header">
+            <p class="question-prompt"><%= question.prompt %></p>
+            <%= button_to topic_question_path(@topic, question), method: :delete,
+                class: "button small danger-button",
+                form: { data: { turbo_confirm: "Remove this question?" } } do %>
+              Remove
+            <% end %>
+          </div>
+          <ul class="answer-list">
+            <% question.answer_choices.each do |choice| %>
+              <li class="<%= choice.correct? ? "correct-choice" : "wrong-choice" %>">
+                <%= choice.correct? ? "✓" : "·" %> <%= choice.body %>
+              </li>
+            <% end %>
+          </ul>
+        </article>
+      <% end %>
+    </div>
+  <% end %>
+</div>

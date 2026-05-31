@@ -1,0 +1,117 @@
+<% content_for :title, "Start Game" %>
+
+<section class="setup-screen" data-controller="game-setup">
+  <div class="setup-heading">
+    <p class="eyebrow">New game</p>
+    <h1>Set up a round</h1>
+  </div>
+
+  <%= form_with model: @game, class: "setup-form" do |form| %>
+    <% if @game.errors.any? %>
+      <div class="notice error">
+        <%= @game.errors.full_messages.to_sentence %>
+      </div>
+    <% end %>
+
+    <section class="setup-block">
+      <h2>Topic</h2>
+      <div class="source-options">
+        <label class="radio-card">
+          <%= radio_button_tag "game[question_source]", "mixed", true, data: { action: "game-setup#changeQuestionSource", game_setup_target: "sourceInput" } %>
+          <span>Mixed questions</span>
+          <small>A bit of everything from the question bank</small>
+        </label>
+
+        <label class="radio-card">
+          <%= radio_button_tag "game[question_source]", "specific", false, data: { action: "game-setup#changeQuestionSource", game_setup_target: "sourceInput" } %>
+          <span>Specific topic</span>
+          <small>Choose one topic from the saved bank</small>
+        </label>
+
+        <label class="radio-card">
+          <%= radio_button_tag "game[question_source]", "custom", false, data: { action: "game-setup#changeQuestionSource", game_setup_target: "sourceInput" } %>
+          <span>Create your own topic</span>
+          <small>LLM-generated questions on a topic of your choice</small>
+        </label>
+      </div>
+
+      <label class="topic-select" data-game-setup-target="topicSelectWrap" hidden>
+        Topic
+        <%= form.collection_select :topic_id, @topics, :id, :name, {}, class: "input", data: { game_setup_target: "topicSelect" } %>
+      </label>
+
+      <label class="topic-select" data-game-setup-target="customTopicWrap" hidden>
+        New topic
+        <%= text_field_tag "game[custom_topic_name]", nil,
+          class: "input",
+          placeholder: "Dinosaurs, oceans, ancient Egypt...",
+          data: { action: "input->game-setup#customTopicChanged", game_setup_target: "customTopicInput" } %>
+      </label>
+      <div class="ai-confirm" data-game-setup-target="customConfirmWrap" hidden>
+        <%= hidden_field_tag "game[custom_topic_confirmed]", "0", data: { game_setup_target: "customConfirmInput" } %>
+        <%= hidden_field_tag "game[pregenerated_topic_id]", nil, data: { game_setup_target: "topicIdInput" } %>
+        <%= hidden_field_tag "game[question_ids]", nil, data: { game_setup_target: "questionIdsInput" } %>
+        <button type="button" class="button secondary" data-action="game-setup#confirmCustomTopic" data-game-setup-target="customConfirmButton" disabled>
+          Generate questions
+        </button>
+        <p data-game-setup-target="customConfirmStatus">Enter a topic name above to generate questions.</p>
+      </div>
+    </section>
+
+    <section class="setup-block">
+      <h2>Players</h2>
+      <div class="segmented four">
+        <% (1..4).each do |count| %>
+          <label>
+            <%= radio_button_tag :player_count, count, count == 2, data: { action: "game-setup#changePlayerCount" } %>
+            <span><%= count %></span>
+          </label>
+        <% end %>
+      </div>
+
+      <div class="player-fields">
+        <% 4.times do |index| %>
+          <label class="numbered-input" data-game-setup-target="playerField">
+            <span><%= index + 1 %></span>
+            <%= text_field_tag "game[player_names][]",
+              index < 2 ? "Player #{index + 1}" : nil,
+              class: "input",
+              placeholder: "Player #{index + 1}",
+              disabled: index >= 2 %>
+          </label>
+        <% end %>
+      </div>
+    </section>
+
+    <section class="setup-grid">
+      <div class="setup-block">
+        <h2>Questions</h2>
+        <div class="segmented three compact">
+          <% [4, 7, 10].each do |count| %>
+            <label>
+              <%= form.radio_button :question_count, count, checked: count == 10 %>
+              <span><%= count %></span>
+            </label>
+          <% end %>
+        </div>
+      </div>
+
+      <div class="setup-block">
+        <h2>Time / turn</h2>
+        <div class="segmented three compact">
+          <% [20, 40, 60].each do |seconds| %>
+            <label>
+              <%= form.radio_button :seconds_per_turn, seconds, checked: seconds == 40 %>
+              <span><%= seconds %>s</span>
+            </label>
+          <% end %>
+        </div>
+      </div>
+    </section>
+
+    <div class="setup-actions">
+      <%= form.submit "Start game", class: "button primary start-wide", data: { game_setup_target: "startButton" } %>
+      <%= link_to "Cancel", dashboard_path, class: "button secondary cancel-wide" %>
+    </div>
+  <% end %>
+</section>

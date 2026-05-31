@@ -1,0 +1,66 @@
+<% content_for :title, "I Have a Riddle for You" %>
+
+<section class="dashboard">
+  <div class="dashboard-start">
+    <h1>Riddle for You</h1>
+    <%= link_to new_game_path, class: "start-game-button" do %>
+      Start a new game
+    <% end %>
+  </div>
+
+  <section class="dashboard-section">
+    <h2>Recent Games</h2>
+    <% if @recent_games_by_day.any? %>
+      <div class="day-groups">
+        <% @recent_games_by_day.each do |day, games| %>
+          <div class="day-group">
+            <h3>
+              <% if day == Date.current %>
+                Today
+              <% elsif day == Date.current.yesterday %>
+                Yesterday
+              <% else %>
+                <%= day.to_fs(:long) %>
+              <% end %>
+            </h3>
+
+            <div class="recent-game-list">
+              <% games.each do |game| %>
+                <%= link_to game_path(game), class: "recent-game-card" do %>
+                  <div>
+                    <strong><%= game.mixed_questions? ? "Mixed" : game.topic.name %></strong>
+                    <span><%= game.players.map { |player| "#{player.name} #{player.score}" }.join(" · ") %></span>
+                  </div>
+                  <div class="recent-game-meta">
+                    <span><%= game.result_summary %></span>
+                    <small><%= pluralize(game.game_questions.size, "question") %></small>
+                  </div>
+                <% end %>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <p>Your first game will show up here.</p>
+    <% end %>
+  </section>
+
+  <section class="dashboard-section">
+    <h2>Question Bank</h2>
+    <div class="bank-list">
+      <% @question_bank_stats.each do |stat| %>
+        <%= link_to topic_questions_path(stat[:topic]), class: "bank-row link-row" do %>
+          <div>
+            <strong><%= stat[:topic].name %></strong>
+            <span><%= stat[:played] %> of <%= stat[:total] %> played</span>
+          </div>
+          <div class="bank-progress" aria-label="<%= stat[:percentage] %>% played">
+            <span style="width: <%= stat[:percentage] %>%"></span>
+          </div>
+          <small><%= stat[:percentage] %>%</small>
+        <% end %>
+      <% end %>
+    </div>
+  </section>
+</section>

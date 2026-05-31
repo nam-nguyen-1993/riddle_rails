@@ -1,0 +1,138 @@
+<% content_for :title, @game.completed? ? "Standings" : "Play Game" %>
+<% active_player_for_theme = @completed_player || @current_player %>
+<% content_for :body_class, "player-theme-#{active_player_for_theme.position}" if active_player_for_theme.present? %>
+<% topic_label = @game.mixed_questions? ? "Mixed questions" : @game.topic.name %>
+
+<% if @completed_player.present? %>
+  <section class="handoff">
+    <div class="handoff-card">
+      <p class="eyebrow"><%= topic_label %></p>
+      <% if @game.completed? %>
+        <h1>All Turns Complete</h1>
+        <p class="lede"><%= @completed_player.name %> finished the last turn. Results are ready.</p>
+        <%= link_to "Show results", game_path(@game), class: "button primary" %>
+      <% else %>
+        <h1><%= @completed_player.name %>'s Turn Is Complete</h1>
+        <p class="lede">Pass the screen to <%= @current_player.name %> when everyone is ready.</p>
+        <%= link_to "Start #{@current_player.name}'s turn", game_path(@game), class: "button primary" %>
+      <% end %>
+    </div>
+  </section>
+<% elsif @game.completed? %>
+  <section class="page-header compact">
+    <div>
+      <p class="eyebrow"><%= topic_label %></p>
+      <h1>Final Standings</h1>
+    </div>
+    <%= link_to "Play again", new_game_path, class: "button primary" %>
+  </section>
+
+  <section class="result-reveal <%= @game.tied? ? "tie" : "winner" %>">
+    <% if @game.tied? %>
+      <div class="tie-burst" aria-hidden="true">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+      <p class="eyebrow">No single winner</p>
+      <h2>Nobody took the cup</h2>
+      <p><%= @game.top_players.map(&:name).to_sentence %> share the top score.</p>
+    <% else %>
+      <div class="cup-stage" aria-hidden="true">
+        <div class="firework one"></div>
+        <div class="firework two"></div>
+        <div class="firework three"></div>
+        <div class="cup">
+          <span class="cup-bowl"></span>
+          <span class="cup-stem"></span>
+          <span class="cup-base"></span>
+        </div>
+      </div>
+      <p class="eyebrow">Winner</p>
+      <h2><%= @game.winner&.name %> wins!</h2>
+      <p><%= pluralize(@game.winner&.score, "point") %></p>
+    <% end %>
+  </section>
+
+  <section class="panel">
+    <div class="standings">
+      <% @game.standings.each.with_index(1) do |player, rank| %>
+        <div class="standing-row">
+          <strong><%= rank %>. <%= player.name %></strong>
+          <span><%= pluralize(player.score, "point") %></span>
+        </div>
+      <% end %>
+    </div>
+  </section>
+
+  <section class="panel review-panel">
+    <h2>Question Review</h2>
+    <div class="review-list">
+      <% @game.game_questions.each do |game_question| %>
+        <% question = game_question.question %>
+        <article class="review-card">
+          <div>
+            <p class="eyebrow">Question <%= game_question.position %></p>
+            <% previous_played_at = @previous_played_at_by_question[question.id] %>
+            <span class="history-tag <%= previous_played_at.present? ? "played" : "fresh" %>">
+              <% if previous_played_at.present? %>
+                Played before on <%= previous_played_at.to_date.to_fs(:long) %>
+              <% else %>
+                First time played
+              <% end %>
+            </span>
+            <h3><%= question.prompt %></h3>
+            <p class="correct-answer">Correct answer: <strong><%= question.correct_answer_choice.body %></strong></p>
+          </div>
+
+          <div class="player-answers">
+            <% @game.players.each do |player| %>
+              <% response = @responses_by_player_and_question[[player.id, question.id]] %>
+              <% selected_answer = response&.answer_choice&.body || "Passed" %>
+              <div class="answer-row <%= response&.correct? ? "correct" : "missed" %>">
+                <span><%= player.name %></span>
+                <strong><%= selected_answer %></strong>
+              </div>
+            <% end %>
+          </div>
+        </article>
+      <% end %>
+    </div>
+  </section>
+<% else %>
+  <section class="page-header compact">
+    <div>
+      <p class="eyebrow">Player <%= @game.current_player_round_label %> · Question <%= @game.progress_label %></p>
+      <h1><%= @current_player.name %>'s Turn</h1>
+    </div>
+  </section>
+
+  <%= turbo_frame_tag "current_turn" do %>
+    <section class="panel question-panel" data-controller="countdown" data-countdown-seconds-value="<%= @game.seconds_per_turn %>">
+      <div class="timer">
+        <span data-countdown-target="remaining"><%= @game.seconds_per_turn %></span>
+        seconds
+      </div>
+
+      <h2><%= @current_question.prompt %></h2>
+
+      <div class="choices">
+        <% @current_question.answer_choices.each do |choice| %>
+          <%= button_to game_responses_path(@game), method: :post, class: "choice-button",
+              data: { action: "click->countdown#choiceSelected" },
+              form: { data: { turbo_frame: "_top" } } do %>
+            <%= hidden_field_tag "response[answer_choice_id]", choice.id %>
+            <%= hidden_field_tag "response[time_taken_seconds]", 0, data: { countdown_target: "elapsed" } %>
+            <%= choice.body %>
+          <% end %>
+        <% end %>
+      </div>
+
+      <%= button_to game_responses_path(@game), method: :post, class: "button pass-button wide",
+          form: { data: { turbo_frame: "_top", countdown_target: "passForm" } } do %>
+        <%= hidden_field_tag "response[time_taken_seconds]", 0, data: { countdown_target: "elapsed" } %>
+        Pass
+      <% end %>
+    </section>
+  <% end %>
+<% end %>

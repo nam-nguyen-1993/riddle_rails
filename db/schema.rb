@@ -10,9 +10,98 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_03_13_202311) do
+ActiveRecord::Schema[8.0].define(version: 2026_05_31_000200) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "answer_choices", force: :cascade do |t|
+    t.bigint "question_id", null: false
+    t.text "body", null: false
+    t.boolean "correct", default: false, null: false
+    t.integer "position", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["question_id", "correct"], name: "index_answer_choices_on_question_id_and_correct"
+    t.index ["question_id", "position"], name: "index_answer_choices_on_question_id_and_position", unique: true
+    t.index ["question_id"], name: "index_answer_choices_on_question_id"
+  end
+
+  create_table "game_questions", force: :cascade do |t|
+    t.bigint "game_id", null: false
+    t.bigint "question_id", null: false
+    t.integer "position", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["game_id", "position"], name: "index_game_questions_on_game_id_and_position", unique: true
+    t.index ["game_id", "question_id"], name: "index_game_questions_on_game_id_and_question_id", unique: true
+    t.index ["game_id"], name: "index_game_questions_on_game_id"
+    t.index ["question_id"], name: "index_game_questions_on_question_id"
+  end
+
+  create_table "games", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "topic_id", null: false
+    t.string "status", default: "setup", null: false
+    t.integer "question_count", default: 10, null: false
+    t.integer "seconds_per_turn", default: 40, null: false
+    t.datetime "started_at"
+    t.datetime "ended_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.boolean "mixed_questions", default: false, null: false
+    t.index ["mixed_questions"], name: "index_games_on_mixed_questions"
+    t.index ["topic_id", "created_at"], name: "index_games_on_topic_id_and_created_at"
+    t.index ["topic_id"], name: "index_games_on_topic_id"
+    t.index ["user_id", "status"], name: "index_games_on_user_id_and_status"
+    t.index ["user_id"], name: "index_games_on_user_id"
+  end
+
+  create_table "players", force: :cascade do |t|
+    t.bigint "game_id", null: false
+    t.string "name", null: false
+    t.integer "position", null: false
+    t.integer "score", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["game_id", "position"], name: "index_players_on_game_id_and_position", unique: true
+    t.index ["game_id"], name: "index_players_on_game_id"
+  end
+
+  create_table "questions", force: :cascade do |t|
+    t.bigint "topic_id", null: false
+    t.text "prompt", null: false
+    t.string "question_format", default: "multiple_choice", null: false
+    t.string "difficulty", default: "easy", null: false
+    t.integer "age_min", default: 7, null: false
+    t.integer "age_max", default: 10, null: false
+    t.text "explanation"
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["topic_id", "active"], name: "index_questions_on_topic_id_and_active"
+    t.index ["topic_id", "difficulty"], name: "index_questions_on_topic_id_and_difficulty"
+    t.index ["topic_id"], name: "index_questions_on_topic_id"
+    t.check_constraint "age_min <= age_max", name: "questions_age_range_check"
+  end
+
+  create_table "responses", force: :cascade do |t|
+    t.bigint "game_id", null: false
+    t.bigint "player_id", null: false
+    t.bigint "question_id", null: false
+    t.bigint "answer_choice_id"
+    t.boolean "correct", default: false, null: false
+    t.integer "time_taken_seconds"
+    t.datetime "answered_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["answer_choice_id"], name: "index_responses_on_answer_choice_id"
+    t.index ["game_id", "player_id", "question_id"], name: "index_responses_on_game_id_and_player_id_and_question_id", unique: true
+    t.index ["game_id", "question_id"], name: "index_responses_on_game_id_and_question_id"
+    t.index ["game_id"], name: "index_responses_on_game_id"
+    t.index ["player_id", "correct"], name: "index_responses_on_player_id_and_correct"
+    t.index ["player_id"], name: "index_responses_on_player_id"
+    t.index ["question_id"], name: "index_responses_on_question_id"
+  end
 
   create_table "solid_cable_messages", force: :cascade do |t|
     t.binary "channel", null: false
@@ -156,6 +245,42 @@ ActiveRecord::Schema[8.0].define(version: 2025_03_13_202311) do
     t.index ["key"], name: "index_solid_queue_semaphores_on_key", unique: true
   end
 
+  create_table "topics", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "slug", null: false
+    t.text "description"
+    t.boolean "active", default: true, null: false
+    t.integer "position", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["active", "position"], name: "index_topics_on_active_and_position"
+    t.index ["name"], name: "index_topics_on_name", unique: true
+    t.index ["slug"], name: "index_topics_on_slug", unique: true
+  end
+
+  create_table "users", force: :cascade do |t|
+    t.string "email", default: "", null: false
+    t.string "encrypted_password", default: "", null: false
+    t.string "reset_password_token"
+    t.datetime "reset_password_sent_at"
+    t.datetime "remember_created_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["email"], name: "index_users_on_email", unique: true
+    t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
+  end
+
+  add_foreign_key "answer_choices", "questions"
+  add_foreign_key "game_questions", "games"
+  add_foreign_key "game_questions", "questions"
+  add_foreign_key "games", "topics"
+  add_foreign_key "games", "users"
+  add_foreign_key "players", "games"
+  add_foreign_key "questions", "topics"
+  add_foreign_key "responses", "answer_choices"
+  add_foreign_key "responses", "games"
+  add_foreign_key "responses", "players"
+  add_foreign_key "responses", "questions"
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_claimed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_failed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
