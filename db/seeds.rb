@@ -291,3 +291,33 @@ topic_facts.each do |topic_name, facts|
     )
   end
 end
+
+# ── LLM-generated question bank ────────────────────────────────────────────
+questions_file = Rails.root.join("db/seeds/questions.json")
+if File.exist?(questions_file)
+  require "json"
+  data = JSON.parse(File.read(questions_file))
+  added = 0
+
+  data.each do |q|
+    topic = Topic.find_or_create_by!(name: q["topic"]) { |t| t.active = true }
+    next if topic.questions.exists?(prompt: q["prompt"])
+
+    topic.questions.create!(
+      prompt:          q["prompt"],
+      explanation:     q["explanation"],
+      difficulty:      q["difficulty"] || "easy",
+      age_min:         q["age_min"] || 7,
+      age_max:         q["age_max"] || 10,
+      question_format: "multiple_choice",
+      answer_choices_attributes: q["choices"].map { |c|
+        { body: c["body"], correct: c["correct"], position: c["position"] }
+      }
+    )
+    added += 1
+  rescue => e
+    Rails.logger.warn "Seed question skipped: #{e.message}"
+  end
+
+  puts "LLM questions: #{added} added, #{data.size - added} already existed."
+end
