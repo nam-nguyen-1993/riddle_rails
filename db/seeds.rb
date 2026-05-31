@@ -38,9 +38,13 @@ unless File.exist?(questions_file)
 end
 
 data = JSON.parse(File.read(questions_file))
-seed_entries = data.each_with_index.map do |question_data, index|
-  question_data.merge("seed_prompt" => "Seed bank #{index + 1}: #{question_data.fetch("prompt")}")
-end
+seed_entries = data
+  .group_by { |question_data| question_data.fetch("topic") }
+  .flat_map do |topic_name, questions|
+    questions.first(50).each_with_index.map do |question_data, index|
+      question_data.merge("seed_prompt" => "Starter bank #{topic_name} #{index + 1}: #{question_data.fetch("prompt")}")
+    end
+  end
 seed_prompts = seed_entries.map { |question_data| question_data["seed_prompt"] }
 
 now = Time.current
