@@ -14,7 +14,6 @@ gem "solid_cable"                     # Database-backed Action Cable
 gem "bootsnap", require: false        # Faster boot times via caching
 gem "thruster", require: false        # HTTP caching/compression for Puma
 gem "tzinfo-data", platforms: %i[windows jruby] # Timezone data for Windows/JRuby
-gem "dotenv"                          # Load environment variables from .env
 gem "devise"                          # Login and authentication
 gem "http"                            # Simple HTTP client for APIs
 gem "rollbar"                         # Error tracking in production
@@ -23,6 +22,7 @@ gem "cgi" # Required for Ruby 4.0+ (removed from stdlib)
 gem "tsort" # Required for Ruby 4.0+ (moving out of default gems)
 
 group :development, :test do
+  gem "dotenv"                          # Load environment variables from .env
   gem "debug", platforms: %i[mri windows], require: "debug/prelude" # Ruby debugger
   gem "rspec-rails", "~> 8.0" # Testing framework
   gem "grade_runner", "~> 0.0.16" # Automated grading
