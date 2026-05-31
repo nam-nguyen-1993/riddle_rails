@@ -292,27 +292,25 @@ topic_facts.each do |topic_name, facts|
   end
 end
 
-# ── LLM-generated question bank (bulk insert — fast) ───────────────────────
+# ── LLM-generated question bank (bulk insert) ──────────────────────────────
 questions_file = Rails.root.join("db/seeds/questions.json")
 if File.exist?(questions_file)
   require "json"
   data = JSON.parse(File.read(questions_file))
-  now  = Time.current
 
-  # Build topic lookup (create any missing ones)
-  topic_names = data.map { |q| q["topic"] }.uniq
-  topic_names.each { |name| Topic.find_or_create_by!(name: name) { |t| t.active = true } }
-  topics_by_name = Topic.where(name: topic_names).index_by(&:name)
-
-  # Skip prompts already in the database
-  existing = Question.where(prompt: data.map { |q| q["prompt"] }).pluck(:prompt).to_set
-  new_data  = data.reject { |q| existing.include?(q["prompt"]) }
-
-  if new_data.empty?
-    puts "LLM questions: all #{data.size} already exist, nothing to add."
+  # Fast check: skip entirely if the bank is already populated
+  if Question.count >= data.size * 0.9
+    puts "LLM questions: bank already populated (#{Question.count} questions). Skipping."
   else
-    # Bulk-insert questions (no callbacks — much faster than create!)
-    question_rows = new_data.filter_map do |q|
+    now = Time.current
+
+    topic_names = data.map { |q| q["topic"] }.uniq
+    topic_names.each { |name| Topic.find_or_create_by!(name: name) { |t| t.active = true } }
+    topics_by_name = Topic.where(name: topic_names).index_by(&:name)
+
+    existing_count = Question.count
+
+    question_rows = data.filter_map do |q|
       topic = topics_by_name[q["topic"]]
       next unless topic
       { topic_id: topic.id, prompt: q["prompt"], explanation: q["explanation"],
@@ -321,13 +319,11 @@ if File.exist?(questions_file)
         active: true, created_at: now, updated_at: now }
     end
 
-    Question.insert_all(question_rows)
+    # insert_all with returning: gives us the new IDs without a second query
+    result = Question.insert_all(question_rows, returning: %w[id prompt])
+    inserted = result.rows.to_h { |id, prompt| [prompt, id] }
 
-    # Fetch the just-inserted IDs
-    inserted = Question.where(prompt: new_data.map { |q| q["prompt"] }).pluck(:prompt, :id).to_h
-
-    # Bulk-insert answer choices
-    choice_rows = new_data.flat_map do |q|
+    choice_rows = data.flat_map do |q|
       qid = inserted[q["prompt"]]
       next [] unless qid
       q["choices"].map do |c|
@@ -338,6 +334,7 @@ if File.exist?(questions_file)
 
     choice_rows.each_slice(1000) { |batch| AnswerChoice.insert_all(batch) }
 
-    puts "LLM questions: #{question_rows.size} added in bulk (#{data.size - new_data.size} already existed)."
+    added = Question.count - existing_count
+    puts "LLM questions: #{added} added (#{Question.count} total)."
   end
 end

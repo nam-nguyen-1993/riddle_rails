@@ -4,7 +4,7 @@ services:
     runtime: ruby
     plan: free
     buildCommand: "./bin/render-build.sh"
-    startCommand: "bundle exec rails db:migrate db:seed && bundle exec thrust bin/rails server"
+    startCommand: "bundle exec rails db:migrate && (bundle exec rails db:seed || true) && bundle exec thrust bin/rails server"
     healthCheckPath: /up
     envVars:
       - key: RAILS_ENV
