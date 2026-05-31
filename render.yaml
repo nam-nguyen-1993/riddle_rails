@@ -4,7 +4,7 @@ services:
     runtime: ruby
     plan: free
     buildCommand: "./bin/render-build.sh"
-    startCommand: "bin/rails server -b 0.0.0.0 -p $PORT"
+    startCommand: "bundle exec rails db:migrate db:seed && bin/rails server -b 0.0.0.0 -p $PORT"
     healthCheckPath: /up
     envVars:
       - key: RAILS_ENV
