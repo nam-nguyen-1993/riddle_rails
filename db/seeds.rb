@@ -1,4 +1,5 @@
 require "json"
+require "set"
 
 # ── Demo user ──────────────────────────────────────────────────────────────
 user = User.find_or_initialize_by(email: "parent@example.com")
@@ -28,7 +29,7 @@ user.save!
   end
 end
 
-# ── Question bank (bulk insert from questions.json) ─────────────────────────
+# Question bank (bulk insert from questions.json)
 questions_file = Rails.root.join("db/seeds/questions.json")
 
 unless File.exist?(questions_file)
@@ -36,58 +37,68 @@ unless File.exist?(questions_file)
   return
 end
 
-if Question.count >= 100
-  puts "Questions already seeded (#{Question.count}). Skipping."
-else
-  data           = JSON.parse(File.read(questions_file))
-  now            = Time.current
-  topics_by_name = Topic.all.index_by(&:name)
+data = JSON.parse(File.read(questions_file))
+seed_entries = data.each_with_index.map do |question_data, index|
+  question_data.merge("seed_prompt" => "Seed bank #{index + 1}: #{question_data.fetch("prompt")}")
+end
+seed_prompts = seed_entries.map { |question_data| question_data["seed_prompt"] }
 
-  # ── 1. Bulk-insert questions ──────────────────────────────────────────────
-  question_rows = data.filter_map do |q|
-    topic = topics_by_name[q["topic"]]
-    next unless topic
+now = Time.current
+topics_by_name = Topic.all.index_by(&:name)
+existing_prompts = Question.where(prompt: seed_prompts).pluck(:prompt).to_set
+
+# 1. Bulk-insert questions. The JSON has repeated prompt text, so each row
+# gets a stable seed prefix and can be looked up unambiguously later.
+question_rows = seed_entries.filter_map do |q|
+  next if existing_prompts.include?(q["seed_prompt"])
+
+  topic = topics_by_name[q["topic"]]
+  next unless topic
+
+  {
+    topic_id:        topic.id,
+    prompt:          q["seed_prompt"],
+    explanation:     q["explanation"],
+    difficulty:      q["difficulty"] || "easy",
+    age_min:         q["age_min"]    || 7,
+    age_max:         q["age_max"]    || 10,
+    question_format: "multiple_choice",
+    active:          true,
+    created_at:      now,
+    updated_at:      now
+  }
+end
+
+Question.insert_all(question_rows) if question_rows.any?
+
+# 2. Fetch inserted IDs by the stable seed prompt.
+id_map = Question.where(prompt: seed_prompts).pluck(:prompt, :id).to_h
+existing_choice_pairs = AnswerChoice
+  .where(question_id: id_map.values)
+  .pluck(:question_id, :position)
+  .to_set
+
+# 3. Bulk-insert missing answer choices. This can repair a partial seed where
+# questions were inserted but choices failed on a previous deploy.
+choice_rows = seed_entries.flat_map do |q|
+  qid = id_map[q["seed_prompt"]]
+  next [] unless qid
+
+  q["choices"].each_with_index.filter_map do |c, index|
+    position = c["position"] || index + 1
+    next if existing_choice_pairs.include?([qid, position])
+
     {
-      topic_id:        topic.id,
-      prompt:          q["prompt"],
-      explanation:     q["explanation"],
-      difficulty:      q["difficulty"] || "easy",
-      age_min:         q["age_min"]    || 7,
-      age_max:         q["age_max"]    || 10,
-      question_format: "multiple_choice",
-      active:          true,
-      created_at:      now,
-      updated_at:      now
+      question_id: qid,
+      body:        c["body"],
+      correct:     c["correct"],
+      position:    position,
+      created_at:  now,
+      updated_at:  now
     }
   end
-
-  Question.insert_all(question_rows)
-
-  # ── 2. Fetch inserted IDs via topic_id (10-item query, not 2500-item) ─────
-  topic_ids = topics_by_name.values.map(&:id)
-  id_map = Question.where(topic_id: topic_ids)
-                   .pluck(:topic_id, :prompt, :id)
-                   .to_h { |tid, prompt, qid| [[tid, prompt], qid] }
-
-  # ── 3. Bulk-insert answer choices ─────────────────────────────────────────
-  choice_rows = data.flat_map do |q|
-    topic = topics_by_name[q["topic"]]
-    next [] unless topic
-    qid = id_map[[topic.id, q["prompt"]]]
-    next [] unless qid
-    q["choices"].map do |c|
-      {
-        question_id: qid,
-        body:        c["body"],
-        correct:     c["correct"],
-        position:    c["position"],
-        created_at:  now,
-        updated_at:  now
-      }
-    end
-  end
-
-  choice_rows.each_slice(1000) { |batch| AnswerChoice.insert_all(batch) }
-
-  puts "Seeded #{Question.count} questions across #{Topic.count} topics."
 end
+
+choice_rows.each_slice(1000) { |batch| AnswerChoice.insert_all(batch) }
+
+puts "Seeded #{question_rows.size} new questions and #{choice_rows.size} new answer choices. Totals: #{Question.count} questions across #{Topic.count} topics."
