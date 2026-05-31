@@ -2,22 +2,12 @@ require "json"
 require "set"
 
 def clean_seed_prompt(prompt)
-  context_prefixes = [
-    "During a classroom quiz", "On the walk home from school", "While reading a picture book", "At the kitchen table",
-    "During a family trivia game", "At a museum visit", "In a science notebook", "During recess trivia",
-    "While making flash cards", "At the library", "During a rainy afternoon quiz", "On a weekend morning",
-    "While playing school", "At homework time", "During a car ride", "At the park",
-    "In a learning game", "During quiet reading time", "While asking a grown-up", "At a study table"
-  ]
-
   prompt
     .to_s
     .sub(/\AStarter bank [^:]+ \d+:\s*/, "")
     .sub(/\ASeed bank \d+:\s*/, "")
     .sub(/\A[^:]+ bank \d+:\s*/, "")
-    .sub(/\A(?:#{context_prefixes.map { |prefix| Regexp.escape(prefix) }.join("|")}),\s*/, "")
     .strip
-    .then { |cleaned_prompt| cleaned_prompt.presence && cleaned_prompt[0].upcase + cleaned_prompt[1..] }
 end
 
 # ── Demo user ──────────────────────────────────────────────────────────────
