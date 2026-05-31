@@ -1,6 +1,15 @@
 require "json"
 require "set"
 
+def clean_seed_prompt(prompt)
+  prompt
+    .to_s
+    .sub(/\AStarter bank [^:]+ \d+:\s*/, "")
+    .sub(/\ASeed bank \d+:\s*/, "")
+    .sub(/\A[^:]+ bank \d+:\s*/, "")
+    .strip
+end
+
 # ── Demo user ──────────────────────────────────────────────────────────────
 user = User.find_or_initialize_by(email: "parent@example.com")
 if user.encrypted_password.blank?
@@ -40,28 +49,31 @@ end
 data = JSON.parse(File.read(questions_file))
 seed_entries = data
   .group_by { |question_data| question_data.fetch("topic") }
-  .flat_map do |topic_name, questions|
-    questions.first(50).each_with_index.map do |question_data, index|
-      question_data.merge("seed_prompt" => "Starter bank #{topic_name} #{index + 1}: #{question_data.fetch("prompt")}")
+  .flat_map do |_topic_name, questions|
+    questions.uniq { |question_data| clean_seed_prompt(question_data.fetch("prompt")) }.map do |question_data|
+      question_data.merge("clean_prompt" => clean_seed_prompt(question_data.fetch("prompt")))
     end
   end
-seed_prompts = seed_entries.map { |question_data| question_data["seed_prompt"] }
+seed_prompts = seed_entries.map { |question_data| question_data["clean_prompt"] }
 
 now = Time.current
 topics_by_name = Topic.all.index_by(&:name)
-existing_prompts = Question.where(prompt: seed_prompts).pluck(:prompt).to_set
+seed_topic_ids = seed_entries.filter_map { |question_data| topics_by_name[question_data["topic"]]&.id }.uniq
+existing_question_keys = Question
+  .where(topic_id: seed_topic_ids, prompt: seed_prompts)
+  .pluck(:topic_id, :prompt)
+  .to_set
 
-# 1. Bulk-insert questions. The JSON has repeated prompt text, so each row
-# gets a stable seed prefix and can be looked up unambiguously later.
+# 1. Bulk-insert questions. Duplicate prompt text in the JSON is deduped per
+# topic so the stored prompt stays clean for players.
 question_rows = seed_entries.filter_map do |q|
-  next if existing_prompts.include?(q["seed_prompt"])
-
   topic = topics_by_name[q["topic"]]
   next unless topic
+  next if existing_question_keys.include?([topic.id, q["clean_prompt"]])
 
   {
     topic_id:        topic.id,
-    prompt:          q["seed_prompt"],
+    prompt:          q["clean_prompt"],
     explanation:     q["explanation"],
     difficulty:      q["difficulty"] || "easy",
     age_min:         q["age_min"]    || 7,
@@ -75,8 +87,11 @@ end
 
 Question.insert_all(question_rows) if question_rows.any?
 
-# 2. Fetch inserted IDs by the stable seed prompt.
-id_map = Question.where(prompt: seed_prompts).pluck(:prompt, :id).to_h
+# 2. Fetch inserted IDs by topic and the stable clean prompt.
+id_map = Question
+  .where(topic_id: seed_topic_ids, prompt: seed_prompts)
+  .pluck(:topic_id, :prompt, :id)
+  .to_h { |topic_id, prompt, question_id| [[topic_id, prompt], question_id] }
 existing_choice_pairs = AnswerChoice
   .where(question_id: id_map.values)
   .pluck(:question_id, :position)
@@ -85,7 +100,10 @@ existing_choice_pairs = AnswerChoice
 # 3. Bulk-insert missing answer choices. This can repair a partial seed where
 # questions were inserted but choices failed on a previous deploy.
 choice_rows = seed_entries.flat_map do |q|
-  qid = id_map[q["seed_prompt"]]
+  topic = topics_by_name[q["topic"]]
+  next [] unless topic
+
+  qid = id_map[[topic.id, q["clean_prompt"]]]
   next [] unless qid
 
   q["choices"].each_with_index.filter_map do |c, index|
