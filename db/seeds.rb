@@ -292,32 +292,52 @@ topic_facts.each do |topic_name, facts|
   end
 end
 
-# ── LLM-generated question bank ────────────────────────────────────────────
+# ── LLM-generated question bank (bulk insert — fast) ───────────────────────
 questions_file = Rails.root.join("db/seeds/questions.json")
 if File.exist?(questions_file)
   require "json"
   data = JSON.parse(File.read(questions_file))
-  added = 0
+  now  = Time.current
 
-  data.each do |q|
-    topic = Topic.find_or_create_by!(name: q["topic"]) { |t| t.active = true }
-    next if topic.questions.exists?(prompt: q["prompt"])
+  # Build topic lookup (create any missing ones)
+  topic_names = data.map { |q| q["topic"] }.uniq
+  topic_names.each { |name| Topic.find_or_create_by!(name: name) { |t| t.active = true } }
+  topics_by_name = Topic.where(name: topic_names).index_by(&:name)
 
-    topic.questions.create!(
-      prompt:          q["prompt"],
-      explanation:     q["explanation"],
-      difficulty:      q["difficulty"] || "easy",
-      age_min:         q["age_min"] || 7,
-      age_max:         q["age_max"] || 10,
-      question_format: "multiple_choice",
-      answer_choices_attributes: q["choices"].map { |c|
-        { body: c["body"], correct: c["correct"], position: c["position"] }
-      }
-    )
-    added += 1
-  rescue => e
-    Rails.logger.warn "Seed question skipped: #{e.message}"
+  # Skip prompts already in the database
+  existing = Question.where(prompt: data.map { |q| q["prompt"] }).pluck(:prompt).to_set
+  new_data  = data.reject { |q| existing.include?(q["prompt"]) }
+
+  if new_data.empty?
+    puts "LLM questions: all #{data.size} already exist, nothing to add."
+  else
+    # Bulk-insert questions (no callbacks — much faster than create!)
+    question_rows = new_data.filter_map do |q|
+      topic = topics_by_name[q["topic"]]
+      next unless topic
+      { topic_id: topic.id, prompt: q["prompt"], explanation: q["explanation"],
+        difficulty: q["difficulty"] || "easy", age_min: q["age_min"] || 7,
+        age_max: q["age_max"] || 10, question_format: "multiple_choice",
+        active: true, created_at: now, updated_at: now }
+    end
+
+    Question.insert_all(question_rows)
+
+    # Fetch the just-inserted IDs
+    inserted = Question.where(prompt: new_data.map { |q| q["prompt"] }).pluck(:prompt, :id).to_h
+
+    # Bulk-insert answer choices
+    choice_rows = new_data.flat_map do |q|
+      qid = inserted[q["prompt"]]
+      next [] unless qid
+      q["choices"].map do |c|
+        { question_id: qid, body: c["body"], correct: c["correct"],
+          position: c["position"], created_at: now, updated_at: now }
+      end
+    end
+
+    choice_rows.each_slice(1000) { |batch| AnswerChoice.insert_all(batch) }
+
+    puts "LLM questions: #{question_rows.size} added in bulk (#{data.size - new_data.size} already existed)."
   end
-
-  puts "LLM questions: #{added} added, #{data.size - added} already existed."
 end
