@@ -1195,8 +1195,7 @@ label {
 }
 
 @media (max-width: 760px) {
-  .page-header,
-  .topbar {
+  .page-header {
     align-items: flex-start;
     flex-direction: column;
   }
