@@ -15,8 +15,22 @@ export default class extends Controller {
     clearInterval(this.timer)
   }
 
-  choiceSelected() {
+  choiceSelected(event) {
     if (navigator.vibrate) navigator.vibrate(50)
+    this.lockUI(event.currentTarget)
+  }
+
+  lockUI(selectedButton) {
+    // Immediately show selected state and disable everything so lag is invisible
+    this.element.querySelectorAll(".choice-button").forEach((btn) => {
+      if (btn === selectedButton) {
+        btn.classList.add("choice-locked-selected")
+      } else {
+        btn.classList.add("choice-locked-dim")
+      }
+    })
+    const passBtn = this.element.querySelector(".pass-button")
+    if (passBtn) passBtn.classList.add("choice-locked-dim")
   }
 
   tick() {

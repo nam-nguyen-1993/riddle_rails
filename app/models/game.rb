@@ -121,7 +121,13 @@ class Game < ApplicationRecord
   end
 
   def select_questions!(questions: nil)
-    source = questions&.first(question_count) || recency_weighted_questions.limit(question_count).to_a
+    source = if questions.present?
+      questions.first(question_count)
+    elsif mixed_questions?
+      topic_varied_questions
+    else
+      recency_weighted_questions.limit(question_count).to_a
+    end
     source.each.with_index(1) do |question, position|
       game_questions.create!(question: question, position: position)
     end
@@ -171,6 +177,23 @@ class Game < ApplicationRecord
     else
       topic.active_questions
     end
+  end
+
+  def topic_varied_questions
+    # Pull a large pool ordered by recency, then round-robin by topic
+    # so mixed games always have maximum variety (max 2 per topic).
+    pool = recency_weighted_questions.limit(question_count * 4).to_a
+    by_topic = pool.group_by(&:topic_id).values.shuffle
+
+    result = []
+    (1..2).each do |pass|
+      by_topic.each do |topic_qs|
+        result << topic_qs[pass - 1] if topic_qs.size >= pass && result.size < question_count
+      end
+      break if result.size >= question_count
+    end
+
+    result.shuffle.first(question_count)
   end
 
   def recency_weighted_questions

@@ -37,6 +37,9 @@
 
 * {
   box-sizing: border-box;
+  /* Eliminate 300ms tap delay on iOS Chrome */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 [hidden] {
@@ -48,6 +51,8 @@ body {
   background: var(--soft);
   color: var(--ink);
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* Respect iPhone notch / home bar */
+  padding-bottom: env(safe-area-inset-bottom);
   line-height: 1.5;
 }
 
@@ -771,6 +776,104 @@ label {
   color: var(--muted);
   font-weight: 800;
   width: 100%;
+}
+
+/* Instant lock state — applied by JS immediately on click so lag is invisible */
+.choice-locked-selected {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+  pointer-events: none;
+}
+
+.choice-locked-dim {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* Auth screens */
+.auth-screen {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: calc(100vh - 120px);
+  padding: 16px;
+}
+
+.auth-card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: clamp(24px, 6vw, 48px);
+  width: 100%;
+  max-width: 420px;
+}
+
+.auth-title {
+  font-size: clamp(1.6rem, 5vw, 2.2rem);
+  margin-bottom: 24px;
+}
+
+.auth-form {
+  display: grid;
+  gap: 16px;
+}
+
+.auth-label {
+  color: var(--muted);
+  display: grid;
+  font-size: 0.9rem;
+  font-weight: 700;
+  gap: 6px;
+}
+
+.auth-hint {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.auth-submit {
+  margin-top: 4px;
+  min-height: 52px;
+  width: 100%;
+}
+
+.auth-alt {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-top: 18px;
+  text-align: center;
+}
+
+/* Mobile game improvements */
+@media (max-width: 640px) {
+  .question-panel h2 {
+    font-size: clamp(1.1rem, 4.5vw, 1.35rem);
+    line-height: 1.4;
+  }
+
+  .choice-button {
+    font-size: 1rem;
+    min-height: 56px;
+    padding: 14px 16px;
+    text-align: left;
+  }
+
+  .pass-button {
+    min-height: 52px;
+  }
+
+  .timer {
+    font-size: 0.9rem;
+  }
+
+  .handoff-card {
+    margin: 0 8px;
+  }
+
+  .page-header.compact h1 {
+    font-size: clamp(1.6rem, 6vw, 2.4rem);
+  }
 }
 
 .review-panel {

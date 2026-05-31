@@ -1,0 +1,31 @@
+<% content_for :title, "Sign in" %>
+
+<div class="auth-screen">
+  <div class="auth-card">
+    <h1 class="auth-title">Welcome back</h1>
+
+    <%= form_for(resource, as: resource_name, url: session_path(resource_name), html: { class: "auth-form" }) do |f| %>
+      <% if alert.present? %>
+        <div class="notice error"><%= alert %></div>
+      <% end %>
+
+      <label class="auth-label">
+        Email
+        <%= f.email_field :email, autofocus: true, autocomplete: "email",
+            class: "input", placeholder: "you@example.com" %>
+      </label>
+
+      <label class="auth-label">
+        Password
+        <%= f.password_field :password, autocomplete: "current-password",
+            class: "input", placeholder: "••••••••" %>
+      </label>
+
+      <%= f.submit "Sign in", class: "button primary auth-submit" %>
+    <% end %>
+
+    <p class="auth-alt">
+      No account? <%= link_to "Sign up", new_user_registration_path %>
+    </p>
+  </div>
+</div>
