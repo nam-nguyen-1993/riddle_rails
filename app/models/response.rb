@@ -36,7 +36,7 @@ class Response < ApplicationRecord
   belongs_to :question
   belongs_to :answer_choice, optional: true
 
-  before_validation :set_answered_at
+  before_validation { self.answered_at ||= Time.current }
   before_validation :set_correctness
   after_create :award_point
 
@@ -50,10 +50,6 @@ class Response < ApplicationRecord
   validate :answer_choice_belongs_to_question
 
   private
-
-  def set_answered_at
-    self.answered_at ||= Time.current
-  end
 
   def set_correctness
     self.correct = answer_choice&.correct? || false

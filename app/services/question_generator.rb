@@ -2,6 +2,7 @@ class QuestionGenerator
   class Error < StandardError; end
 
   JSON_FENCE_PATTERN = /\A```(?:json)?\s*|\s*```\z/
+  BOOLEAN_CASTER = ActiveModel::Type::Boolean.new
 
   def initialize(topic:, count:, difficulty: "easy", age_min: 7, age_max: 10)
     @topic = topic
@@ -34,8 +35,7 @@ class QuestionGenerator
   end
 
   def ask_model
-    response = RubyLLM.chat.ask(prompt)
-    response.respond_to?(:content) ? response.content : response.to_s
+    RubyLLM.chat.ask(prompt).content.to_s
   end
 
   def prompt
@@ -91,7 +91,7 @@ class QuestionGenerator
       answer_choices_attributes: choices.each_with_index.map do |choice, index|
         {
           body: choice.fetch("body"),
-          correct: ActiveModel::Type::Boolean.new.cast(choice.fetch("correct")),
+          correct: BOOLEAN_CASTER.cast(choice.fetch("correct")),
           position: index + 1
         }
       end
@@ -103,7 +103,7 @@ class QuestionGenerator
   def validate_choices!(choices)
     raise Error, "Each generated question must include exactly 4 answer choices." unless choices.size == 4
 
-    correct_count = choices.count { |choice| ActiveModel::Type::Boolean.new.cast(choice["correct"]) }
+    correct_count = choices.count { |choice| BOOLEAN_CASTER.cast(choice["correct"]) }
     raise Error, "Each generated question must include exactly 1 correct answer." unless correct_count == 1
   end
 end

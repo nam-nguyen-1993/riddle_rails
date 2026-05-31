@@ -18,6 +18,19 @@ RSpec.describe "game setup", type: :request do
     expect(game.questions.size).to eq(2)
   end
 
+  it "does not crash when the question bank has not been seeded" do
+    user = User.create!(email: "parent@example.com", password: "password")
+
+    sign_in user, scope: :user
+
+    expect do
+      post games_path, params: game_params(question_source: "mixed")
+    end.not_to change(Game, :count)
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(response.body).to include("The question bank is empty. Please seed topics before starting a game.")
+  end
+
   it "starts a game from a specific saved topic" do
     user = User.create!(email: "parent@example.com", password: "password")
     math = Topic.create!(name: "Math")
@@ -60,6 +73,28 @@ RSpec.describe "game setup", type: :request do
     expect(game.questions).not_to include(old_question)
   end
 
+  it "rejects pregenerated question ids that do not belong to the generated topic" do
+    user = User.create!(email: "parent@example.com", password: "password")
+    generated_topic = Topic.create!(name: "Space explorers")
+    other_topic = Topic.create!(name: "Animals")
+    generated_questions = 5.times.map { |i| create_question(generated_topic, "Generated question #{i + 1}?") }
+    other_questions = 5.times.map { |i| create_question(other_topic, "Other question #{i + 1}?") }
+
+    sign_in user, scope: :user
+
+    expect do
+      post games_path, params: game_params(
+        question_source: "custom",
+        pregenerated_topic_id: generated_topic.id,
+        question_ids: (generated_questions + other_questions).map(&:id).join(","),
+        question_count: 10
+      )
+    end.not_to change(Game, :count)
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(response.body).to include("Generate enough questions for this topic before starting the game.")
+  end
+
   it "requires a pre-generated topic before starting a custom topic game" do
     user = User.create!(email: "parent@example.com", password: "password")
     Topic.create!(name: "Math")
@@ -70,7 +105,7 @@ RSpec.describe "game setup", type: :request do
       post games_path, params: game_params(question_source: "custom")
     end.not_to change(Game, :count)
 
-    expect(response).to have_http_status(:unprocessable_entity)
+    expect(response).to have_http_status(:unprocessable_content)
     expect(response.body).to include("Confirm your AI topic before starting the game.")
   end
 

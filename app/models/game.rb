@@ -38,7 +38,7 @@ class Game < ApplicationRecord
   has_many :game_questions, -> { order(:position) }, dependent: :destroy, inverse_of: :game
   has_many :questions, through: :game_questions
   has_many :responses, dependent: :destroy
-  has_many :standings, -> { order(score: :desc, position: :asc) }, class_name: "Player", inverse_of: :game
+  has_many :standings, -> { by_score }, class_name: "Player", inverse_of: :game
 
   accepts_nested_attributes_for :players, allow_destroy: true
 
@@ -72,13 +72,17 @@ class Game < ApplicationRecord
   end
 
   def total_turn_count
-    players.count * game_questions.count
+    players.size * game_questions.size
   end
 
   def current_game_question
     return nil if completed? || game_questions.empty?
 
-    game_questions.offset(current_question_index).first
+    if game_questions.loaded?
+      game_questions.to_a[current_question_index]
+    else
+      game_questions.offset(current_question_index).first
+    end
   end
 
   def current_question
@@ -88,23 +92,32 @@ class Game < ApplicationRecord
   def current_player
     return nil if players.empty?
 
-    players.offset(current_player_index).first
+    if players.loaded?
+      players.to_a[current_player_index]
+    else
+      players.offset(current_player_index).first
+    end
   end
 
   def progress_label
-    "#{[current_question_index + 1, game_questions.count].min} of #{game_questions.count}"
+    "#{current_question_index + 1} of #{game_questions.size}"
   end
 
   def current_player_round_label
-    "#{[current_player_index + 1, players.count].min} of #{players.count}"
+    "#{current_player_index + 1} of #{players.size}"
   end
 
   def complete_round?
-    total_turn_count.positive? && responses.count >= total_turn_count
+    total = total_turn_count
+    total.positive? && responses.count >= total
   end
 
   def player_turn_complete?
-    game_questions.count.positive? && (responses.count % game_questions.count).zero?
+    game_questions.size.positive? && (responses.count % game_questions.size).zero?
+  end
+
+  def topic_label
+    mixed_questions? ? "Mixed questions" : topic.name
   end
 
   def select_questions!(questions: nil)
@@ -115,10 +128,10 @@ class Game < ApplicationRecord
   end
 
   def top_players
-    highest_score = players.maximum(:score)
-    return Player.none if highest_score.blank?
-
-    players.where(score: highest_score).order(:position)
+    @top_players ||= begin
+      highest_score = players.maximum(:score)
+      highest_score.blank? ? Player.none : players.where(score: highest_score)
+    end
   end
 
   def tied?
@@ -143,13 +156,13 @@ class Game < ApplicationRecord
   def current_question_index
     return 0 if game_questions.empty?
 
-    current_turn_index % game_questions.count
+    current_turn_index % game_questions.size
   end
 
   def current_player_index
     return 0 if game_questions.empty?
 
-    current_turn_index / game_questions.count
+    current_turn_index / game_questions.size
   end
 
   def question_pool

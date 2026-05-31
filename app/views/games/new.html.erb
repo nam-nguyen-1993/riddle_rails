@@ -11,6 +11,10 @@
       <div class="notice error">
         <%= @game.errors.full_messages.to_sentence %>
       </div>
+    <% elsif @topics.empty? %>
+      <div class="notice error">
+        The question bank is empty. Please seed topics before starting a game.
+      </div>
     <% end %>
 
     <section class="setup-block">

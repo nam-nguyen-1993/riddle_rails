@@ -1,7 +1,7 @@
 <% content_for :title, @game.completed? ? "Standings" : "Play Game" %>
 <% active_player_for_theme = @completed_player || @current_player %>
 <% content_for :body_class, "player-theme-#{active_player_for_theme.position}" if active_player_for_theme.present? %>
-<% topic_label = @game.mixed_questions? ? "Mixed questions" : @game.topic.name %>
+<% topic_label = @game.topic_label %>
 
 <% if @completed_player.present? %>
   <section class="handoff">

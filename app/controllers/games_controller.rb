@@ -16,19 +16,22 @@ class GamesController < ApplicationController
     @topics = Topic.active.ordered
     player_names = normalized_player_names
 
+    if player_names.empty?
+      @game = current_user.games.new
+      @game.errors.add(:players, "add at least one player")
+      render :new, status: :unprocessable_content
+      return
+    end
+
     @game = current_user.games.new(game_params.except(:topic_id, :mixed_questions))
     player_names.each.with_index(1) do |name, position|
       @game.players.build(name: name, position: position)
     end
 
-    if player_names.empty?
-      @game.errors.add(:players, "add at least one player")
-      render :new, status: :unprocessable_entity
-      return
-    end
-
     ActiveRecord::Base.transaction do
       configure_question_source
+      raise ActiveRecord::Rollback if @game.errors.any?
+
       @game.save!
       select_game_questions!
 
@@ -43,11 +46,11 @@ class GamesController < ApplicationController
     if @game.persisted? && @game.active?
       redirect_to @game
     else
-      render :new, status: :unprocessable_entity
+      render :new, status: :unprocessable_content
     end
   rescue ActiveRecord::RecordInvalid => e
     @game.errors.add(:base, e.message)
-    render :new, status: :unprocessable_entity
+    render :new, status: :unprocessable_content
   end
 
   def show
@@ -85,6 +88,9 @@ class GamesController < ApplicationController
   def configure_question_source
     case question_source
     when "mixed"
+      require_seeded_topic!
+      return if @game.errors.any?
+
       @game.topic = @topics.first
       @game.mixed_questions = true
     when "custom"
@@ -104,6 +110,9 @@ class GamesController < ApplicationController
       @game.topic = topic
       @game.mixed_questions = false
     else
+      require_seeded_topic!
+      return if @game.errors.any?
+
       @game.topic = @topics.find { |t| t.id == game_params[:topic_id].to_i } || @topics.first
       @game.mixed_questions = false
     end
@@ -111,7 +120,12 @@ class GamesController < ApplicationController
 
   def select_game_questions!
     if @pregenerated_question_ids.present?
-      questions = Question.active.where(id: @pregenerated_question_ids).to_a
+      questions = @game.topic.questions.active.where(id: @pregenerated_question_ids).to_a
+      if questions.size < @game.question_count
+        @game.errors.add(:base, "Generate enough questions for this topic before starting the game.")
+        raise ActiveRecord::Rollback
+      end
+
       @game.select_questions!(questions: questions)
     else
       @game.select_questions!
@@ -120,6 +134,12 @@ class GamesController < ApplicationController
 
   def question_source
     params.dig(:game, :question_source).presence_in(%w[mixed specific custom]) || "mixed"
+  end
+
+  def require_seeded_topic!
+    return if @topics.any?
+
+    @game.errors.add(:base, "The question bank is empty. Please seed topics before starting a game.")
   end
 
   def previous_played_at_by_question
